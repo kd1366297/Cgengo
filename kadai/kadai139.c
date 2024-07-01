@@ -1,0 +1,21 @@
+#include<stdio.h>
+void hyouzi(char moji, int n);
+main()
+{
+	int n;
+	char moji;
+	printf("ï∂éö?:");
+	scanf("%c", &moji);
+	printf("êÆêî?:");
+	scanf("%d", &n);
+	hyouzi(moji, n);
+}
+void hyouzi(char moji, int n)
+{
+	int i;
+	for (i = 0; i < n; i++)
+	{
+		printf("%c", moji);
+	}
+}
+
