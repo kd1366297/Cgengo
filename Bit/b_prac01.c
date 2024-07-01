@@ -33,28 +33,72 @@ typedef struct {
 enum BitState
 {
 	Base = 0,			//00000000 通常状態
-	Poison = 1 << 1,	//00000001 毒状態
-	Sleep = 1 << 2,		//00000010 眠り状態
-	Paralysis = 1 << 3,	//00000100 麻痺状態
-	Burn = 1 << 4,		//00001000 やけど状態
-	AtkUp = 1 << 5,		//00010000 攻撃力アップ状態
-	AtkDown = 1 << 6,	//00100000 攻撃力ダウン状態
+	Poison = 1 << 0,	//00000001 毒状態
+	Sleep = 1 << 1,		//00000010 眠り状態
+	Paralysis = 1 << 2,	//00000100 麻痺状態
+	Burn = 1 << 3,		//00001000 やけど状態
+	AtkUp = 1 << 4,		//00010000 攻撃力アップ状態
+	AtkDown = 1 << 5,	//00100000 攻撃力ダウン状態
+	Dead = 1 << 6,		//0000 0000 0100 0000(死亡フラグ)
+	Atk_Skill = 1 << 7	//0000 0000 1000 0000
+						//(このフラグがONのキャラしか状態異常を付加できない)
 };
-typedef unsigned int UINT;
-void DisplayStatus(UINT s);
-void ChangeFlag(UINT* s);
-void ClearFlag(UINT* s);
 
-main()
+int TurnCount = 0;	//経過ターン(0～999)
+
+void DisplayStatus(Chara c);
+//void ChangeFlag(UINT* s);
+//void ClearFlag(UINT* s);
+
+//戦闘モードへ移行す関数
+void BattleMode(Chara* c, Mob m);
+//戦闘時のメニュー表示
+int DisplayMenu(void);
+//スキル使用時のメニュー表示
+int SkillMenu(Chara c);
+//攻撃側と防御側のパラメータを使った攻撃ダメージ計算
+int DamageCalc(Spec sp1, Spec sp2);
+//戦闘モード時のHP計算と死亡判定
+void BattleMessage(Spec sp1, Spec* sp2);
+
+
+
+main(int argc,char *argv[])
 {
-	UINT MyState = Base;
-	//MyState |= (Poison | Sleep);
-	DisplayStatus(MyState);
-	ChangeFlag(&MyState);
-	DisplayStatus(MyState);
-	ClearFlag(&MyState);
-	DisplayStatus(MyState);
+	//乱数列(シード)の初期化
+	srand(time(0));
+
+	//			name	  hp   atk def state maxhp mp
+	Chara chara = { "主人公",2000,200,100,Base,2000,150,
+		//	sk.name
+			{{"HP回復",		0,	50,	800},
+			{"攻撃力アップ",1,	50,	120},
+			{"状態異常回復",2,	20,	0}} };
+	Mob mob[Mob_Num] = {
+		//name hp  atk def state              rate%
+		{"敵A",700,150,800,Poison | Atk_Skill,30},
+		{"敵B",1500,200,200,Burn | Atk_Skill,30},
+		{"ボス",5000,200,80,AtkDown | Atk_Skill,10} };
+
+	//乱数で0～Mob_Num-1の数値を求める
+	int num = rand() % Mob_Num;
+	//実行時にコマンドライン引数があった場合
+	if (argc > 1) {
+		//引数を数値に変換
+		num = atoi(argv[1]);
+		//因数の数値が0～Mob_Num-1の範囲になければ
+		if (num < 0 || num >= Mob_Num) {
+			//乱数を生成
+			num = rand() % Mob_Num;
+		}
+	}
+	//戦闘モードを開始
+	BattleMode(&chara, mob[num]);
+	if (chara.sp.state & Dead) {
+		printf("%sの死亡によりゲームオーバー\n", chara.sp.name);
+	}
 }
+
 void DisplayStatus(UINT s)
 {
 	printf("****現在の状態****\n");
