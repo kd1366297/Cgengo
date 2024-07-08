@@ -120,7 +120,7 @@ int DamageCalc(Spec sp1, Spec sp2) {
 	damage = sp1.atk * ((float)sp1.atk / sp2.def)
 		+ sp1.atk * (rand() % 50) / 100.0;
 	//100分の1の確率で会心/痛恨の一撃
-	if (rand() % 100 == 99) {
+	if (rand() % 100 <= 50) {
 		return 2 * damage;  //ダメージ量2倍
 	}
 	return damage;  //通常ダメージ
@@ -195,6 +195,52 @@ void BattleMode(Chara* c, Mob m) {
 			}
 		}
 		//[スキル]
+		else if (command == 2) {
+			printf("スキルの選択\n");
+			skill = SkillMenu(*c);//skillは0～20のいずれか
+			//MP残量チェック
+			if (c->mp >= c->skl[skill].use_mp){
+				switch (skill) {
+				case 0:	//HP回復スキル使用時の処理
+					c->sp.hp += c->skl[skill].effect;
+					if (c->sp.hp > c->maxhp) { c->sp.hp = c->maxhp; }
+					//自キャラのMPを使用した分減らす
+					c->mp -= c->skl[skill].use_mp;
+					printf("HPを%d回復した!\n", c->skl[skill].effect);
+					DisplayStatus(*c);
+					break;
+				case 1:	//攻撃力アップの処理
+					//自キャラATKを1.20倍(=120÷100)
+					c->sp.atk *= c->skl[skill].effect / 100.0;
+					//自キャラのMPを使用した分減らす
+					c->mp -= c->skl[skill].use_mp;
+					//攻撃力アップフラグON
+					c->sp.state |= AtkUp;
+					printf("攻撃力がアップした!\n");
+					DisplayStatus(*c);
+					break;
+				case 2:	//状態異常回復の処理
+					//攻撃力アップは異常ではないので残す
+					if (c->sp.state & AtkUp) {
+						c->sp.state = Base;	//状態変化をリセット
+						c->sp.state |= AtkUp;	//攻撃力アップを再度付加
+					}
+					else {
+						c->sp.state = Base;	//状態変化をリセット
+					}
+					//自キャラのMPを使用した分減らす
+					c->mp -= c->skl[skill].use_mp;
+					printf("状態異常が回復した!\n");
+					DisplayStatus(*c);
+					break;
+				default:
+					break;
+				}
+			}
+			else {	//MP残量チェックにひっかかった時の処理
+				printf("MPが足りない!\n");
+			}
+		}
 	}
 }
 
@@ -235,6 +281,22 @@ int DisplayMenu(void)
 		{
 			//隠しコマンド:強制終了'q'
 			return-1;
+		}
+	}
+}
+
+int SkillMenu(Chara c) {
+	char ch;
+	int i;
+	while (1) {
+		printf("----------\nスキルを選択\n");
+		for (i = 0; i < Skil_Num; i++) {
+			printf("%d.%s\n", i + 1, c.skl[i].name);
+		}
+		printf("\n");
+		ch = getch();
+		if (ch > '0' && ch < '4') {
+			return ch - '0' - 1;
 		}
 	}
 }
