@@ -2,8 +2,8 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<time.h>
-#define Skil_Num 3
-#define Mob_Num 3
+#define Skil_Num 4	//スキル数
+#define Mob_Num 3	//敵の種類
 //符号無し整数をUINTで再定義
 typedef unsigned int UINT;
 
@@ -44,8 +44,9 @@ enum BitState
 	AtkUp = 1 << 4,      //0000 0000 0001 0000(攻撃力Up)
 	AtkDown = 1 << 5,    //0000 0000 0010 0000(攻撃力Down)
 	Dead = 1 << 6,       //0000 0000 0100 0000(死亡フラグ)
-	Atk_Skill = 1 << 7   //0000 0000 1000 0000
-	//(このフラグがONのキャラしか状態異常を付加できない）
+	Atk_Skill = 1 << 7,  //0000 0000 1000 0000
+						 //(このフラグがONのキャラしか状態異常を付加できない）
+	DefUp = 1 << 8		 //0000 0001 0000 0000(防御力アップ)
 };
 
 int TurnCount = 0;     //経過ターン(0～999)
@@ -77,9 +78,10 @@ main(int argc, char* argv[])
 	//              name    hp    atk  def  state maxhp mp
 	Chara chara = { "主人公",2000, 200, 100, Base, 2000, 150,
 		//  sk.name    type usemp effect 
-		   {{"HP回復",     0,   50,  800},
-			  {"攻撃力アップ", 1,   50,  120},
-			  {"状態異常回復", 2,   20,    0}} };
+		   {{"HP回復",		0,   50,  800},
+			{"攻撃力アップ",1,   50,  120},
+			{"防御力アップ",3,	 50,  150},
+			{"状態異常回復",2,   20,    0}} };
 	Mob mob[Mob_Num] = {
 		//name hp   atk def  state               rate%
 		{"敵A", 700,150, 800,Poison | Atk_Skill,  30},
@@ -200,7 +202,7 @@ void BattleMode(Chara* c, Mob m) {
 			skill = SkillMenu(*c);//skillは0～20のいずれか
 			//MP残量チェック
 			if (c->mp >= c->skl[skill].use_mp){
-				switch (skill) {
+				switch (c->skl[skill].type) {
 				case 0:	//HP回復スキル使用時の処理
 					c->sp.hp += c->skl[skill].effect;
 					if (c->sp.hp > c->maxhp) { c->sp.hp = c->maxhp; }
@@ -220,6 +222,16 @@ void BattleMode(Chara* c, Mob m) {
 					DisplayStatus(*c);
 					break;
 				case 2:	//状態異常回復の処理
+					UINT back = Base;
+					if (c->sp.state & AtkUp) {
+						back |= AtkUp;
+					}
+					if (c->sp.state & DefUp) {
+						back |= DefUp;
+					}
+					c->sp.state = Base;
+					c->sp.state |= back;
+
 					//攻撃力アップは異常ではないので残す
 					if (c->sp.state & AtkUp) {
 						c->sp.state = Base;	//状態変化をリセット
@@ -233,6 +245,19 @@ void BattleMode(Chara* c, Mob m) {
 					printf("状態異常が回復した!\n");
 					DisplayStatus(*c);
 					break;
+				case 3:	//防御力アップ処理
+					//自キャラのDef値を1.5倍にする
+					c->sp.def *= c->skl[skill].effect / 100.0;
+					//自キャラのDefUpフラグを立てる
+					c->sp.state |= DefUp;
+					//自キャラのMPを使用した分減らす
+					c->mp -= c->skl[skill].use_mp;
+					//メッセージで防御力がアップしたことを表示
+					printf("防御力がアップした!\n");
+					//自キャラのステータスを表示
+					DisplayStatus(*c);
+					break;
+
 				default:
 					break;
 				}
@@ -261,6 +286,7 @@ void DisplayStatus(Chara c) {
 		if (c.sp.state & Burn) { printf("火傷 "); }
 		if (c.sp.state & AtkUp) { printf("攻撃力アップ "); }
 		if (c.sp.state & AtkDown) { printf("攻撃力ダウン"); }
+		if (c.sp.state & DefUp) { printf("防御力アップ"); }
 	}
 	printf("\n******************\n");
 }
@@ -286,17 +312,16 @@ int DisplayMenu(void)
 }
 
 int SkillMenu(Chara c) {
-	char ch;
-	int i;
+	int i,ch;
 	while (1) {
 		printf("----------\nスキルを選択\n");
 		for (i = 0; i < Skil_Num; i++) {
 			printf("%d.%s\n", i + 1, c.skl[i].name);
 		}
 		printf("\n");
-		ch = getch();
-		if (ch > '0' && ch < '4') {
-			return ch - '0' - 1;
+		ch = getch() - '0';
+		if (ch > 0 && ch <= Skil_Num) {
+			return ch - 1;
 		}
 	}
 }
